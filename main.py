@@ -4,31 +4,31 @@ import telebot
 from telebot import types
 
 # =========================
-TOKEN = os.getenv("BOT_TOKEN")  # 🔥 BOT token serverdan olinadi
-ADMIN_IDS = {6419271223, 6994628664}  # Bir nechta adminlar Telegram ID
-ADMIN_USERNAMES = {"dizel_go", "admin2"}  # Adminlar username
+TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_IDS = {6419271223, 6994628664}  # Bir nechta adminlar Telegram IDlari
+ADMIN_USERNAMES = {"dizel_go", "admin2"}  # Admin nicklari
 PRICE_PER_LITR = 10500
 USERS_FILE = "users.json"
 # =========================
 
 bot = telebot.TeleBot(TOKEN)
 
-# ================= Foydalanuvchilarni yuklash =================
-if os.path.exists(USERS_FILE):
-    with open(USERS_FILE, "r", encoding="utf-8") as f:
+# ================= Fayllarni yuklash =================
+try:
+    with open(USERS_FILE, "r") as f:
         registered_users = set(json.load(f))
-else:
+except (FileNotFoundError, json.JSONDecodeError):
     registered_users = set()
 
-def save_users():
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(list(registered_users), f, ensure_ascii=False)
-
-# ================= Ma’lumotlar =================
-user_data = {}            # Mijoz ma'lumotlari
+user_data = {}            # Hozirgi session ma'lumotlari
 order_history = []        # Buyurtma tarixi
 pending_delivery = {}     # Yetkazib berish vaqtini kiritishni kutayotgan buyurtmalar
 broadcast_cache = {}      # Admin xabar yuborish uchun
+
+# ================= Faylga saqlash =================
+def save_users():
+    with open(USERS_FILE, "w") as f:
+        json.dump(list(registered_users), f)
 
 # ================= Main Menu =================
 def main_menu(chat_id):
@@ -91,7 +91,7 @@ def handle_text(message):
     chat_id = message.chat.id
     text = message.text.strip()
 
-    # ======= Admin post yuborish =======
+    # ===== Admin xabar yuborish =====
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "text":
         broadcast_cache[chat_id]["text"] = text
         broadcast_cache[chat_id]["step"] = "confirm"
@@ -113,7 +113,7 @@ def handle_text(message):
             bot.send_message(chat_id, "❗️ Tasdiqlash uchun 'Ha' yoki 'Yo'q' deb yozing.")
         return
 
-    # ======= Admin yetkazib berish =======
+    # ===== Admin yetkazib berish vaqtini kiritish =====
     if chat_id in ADMIN_IDS and chat_id in pending_delivery and text.isdigit():
         delivery_minutes = int(text)
         order = pending_delivery.pop(chat_id)
@@ -130,13 +130,14 @@ def handle_text(message):
         order['status'] = "qabul qilindi"
         order['delivery_minutes'] = delivery_minutes
         order_history.append(order)
+
         del user_data[user_id]
 
         main_menu(user_id)
         return
 
-    # ================= Admin menyusi =================
-    if chat_id not in user_data and chat_id in ADMIN_IDS:
+    # ===== Admin menyusi =====
+    if chat_id in ADMIN_IDS and chat_id not in user_data:
         if text == "👥 Foydalanuvchilar haqida ma’lumot":
             if not registered_users:
                 bot.send_message(chat_id, "Hech qanday foydalanuvchi yo‘q.")
@@ -148,8 +149,8 @@ def handle_text(message):
             broadcast_cache[chat_id] = {"step": "text"}
         return
 
-    # ================= Foydalanuvchi buyurtma =================
-    if "litr" not in user_data.get(chat_id, {}):
+    # ===== Foydalanuvchi buyurtma =====
+    if "litr" not in user_data[chat_id]:
         if not text.isdigit():
             bot.send_message(chat_id, "❗️ Iltimos, faqat son kiriting (litr).")
             return
@@ -173,7 +174,11 @@ def handle_text(message):
 def handle_location(message):
     chat_id = message.chat.id
     user_data[chat_id] = user_data.get(chat_id, {})
-    # Lokatsiyani adminlardan biriga yuboramiz (birinchi admin)
+    user_data[chat_id]["location"] = {
+        "latitude": message.location.latitude,
+        "longitude": message.location.longitude
+    }
+    # Lokatsiyani adminlardan biriga forward qilamiz
     bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
 
@@ -190,7 +195,6 @@ def send_to_admin(chat_id, message):
 
     username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
     msg = f"🆕 Yangi buyurtma: {username}\n💧 Litr: {litrs}\n📞 Telefon: {phone}"
-
     for admin_id in ADMIN_IDS:
         bot.send_message(admin_id, msg, reply_markup=markup)
 
@@ -206,7 +210,8 @@ def callback_handler(call):
             "user_id": user_id,
             "litr": litrs,
             "telefon": user_data[user_id]["telefon"],
-            "username": call.from_user.username or call.from_user.first_name
+            "username": call.from_user.username or call.from_user.first_name,
+            "location": user_data[user_id].get("location")
         }
         bot.send_message(call.message.chat.id, "⏱️ Necha daqiqada yetkaziladi? (faqat son kiriting)")
         bot.answer_callback_query(call.id, "Buyurtma qabul qilindi, yetkazish vaqtini kiriting")
@@ -218,7 +223,8 @@ def callback_handler(call):
             "litr": litrs,
             "telefon": user_data[user_id]["telefon"],
             "status": "rad qilindi",
-            "delivery_minutes": None
+            "delivery_minutes": None,
+            "location": user_data[user_id].get("location")
         })
         bot.send_message(user_id, "❌ Afsus, buyurtmangiz rad etildi.")
         bot.answer_callback_query(call.id, "Buyurtma rad qilindi")
