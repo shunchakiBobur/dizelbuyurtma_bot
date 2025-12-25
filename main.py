@@ -89,18 +89,21 @@ def handle_text(message):
     # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
         if text.lower() == "ha":
+            # Barcha foydalanuvchilarga xabar yuboriladi
             for user in registered_users:
                 bot.send_message(user, broadcast_cache[chat_id]["text"])
             bot.send_message(chat_id, "✅ Xabar foydalanuvchilarga yuborildi.")
             broadcast_cache.pop(chat_id)
+            admin_menu()  # Admin paneliga qaytish
         elif text.lower() in ["yo'q", "yoq"]:
             bot.send_message(chat_id, "❌ Xabar yuborish bekor qilindi.")
             broadcast_cache.pop(chat_id)
+            admin_menu()  # Admin paneliga qaytish
         else:
             bot.send_message(chat_id, "❗️ Tasdiqlash uchun 'Ha' yoki 'Yo'q' deb yozing.")
         return
 
-    # ======= Admin yetkazib berish vaqtini kiritish =======
+    # ======= Admin buyurtmalarini tasdiqlash =======
     if chat_id in ADMIN_IDS and chat_id in pending_delivery and text.isdigit():
         delivery_minutes = int(text)
         order = pending_delivery.pop(chat_id)
@@ -123,7 +126,7 @@ def handle_text(message):
         main_menu(user_id)
         return
 
-    # ======= Admin buyurtmalarini tasdiqlash =======
+    # ======= Admin buyurtmalarini ko'rish va boshqa buyruqlar =======
     if chat_id not in user_data:
         if chat_id in ADMIN_IDS:
             if text == "👥 Foydalanuvchilar haqida ma’lumot":
