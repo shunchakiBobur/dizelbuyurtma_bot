@@ -1,34 +1,21 @@
 import os
-import json
 import telebot
 from telebot import types
 
 # =========================
-TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = {6419271223, 6994628664}  # Bir nechta adminlar Telegram IDlari
+TOKEN = os.getenv("BOT_TOKEN")  # 🔥 TOKEN serverdan olinadi
+ADMIN_IDS = {6419271223, 123456789}  # Bir nechta adminlar Telegram IDlari
 ADMIN_USERNAMES = {"dizel_go", "admin2"}  # Admin nicklari
 PRICE_PER_LITR = 10500
-USERS_FILE = "users.json"
 # =========================
 
 bot = telebot.TeleBot(TOKEN)
 
-# ================= Fayllarni yuklash =================
-try:
-    with open(USERS_FILE, "r") as f:
-        registered_users = set(json.load(f))
-except (FileNotFoundError, json.JSONDecodeError):
-    registered_users = set()
-
-user_data = {}            # Hozirgi session ma'lumotlari
+user_data = {}            # Mijoz ma'lumotlari
 order_history = []        # Buyurtma tarixi
 pending_delivery = {}     # Yetkazib berish vaqtini kiritishni kutayotgan buyurtmalar
+registered_users = set()  # Bot foydalanuvchilari
 broadcast_cache = {}      # Admin xabar yuborish uchun
-
-# ================= Faylga saqlash =================
-def save_users():
-    with open(USERS_FILE, "w") as f:
-        json.dump(list(registered_users), f)
 
 # ================= Main Menu =================
 def main_menu(chat_id):
@@ -54,7 +41,6 @@ def start(message):
     chat_id = message.chat.id
     if chat_id not in registered_users:
         registered_users.add(chat_id)
-        save_users()
         bot.send_message(chat_id, f"Assalomu alaykum, {message.from_user.first_name}!\nBotimizga xush kelibsiz!")
     if chat_id in ADMIN_IDS:
         admin_menu()
@@ -91,15 +77,7 @@ def handle_text(message):
     chat_id = message.chat.id
     text = message.text.strip()
 
-    # ===== Admin xabar yuborish =====
-    if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "text":
-        broadcast_cache[chat_id]["text"] = text
-        broadcast_cache[chat_id]["step"] = "confirm"
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-        markup.add("Ha", "Yo'q")
-        bot.send_message(chat_id, f"Xabarni foydalanuvchilarga yuborishni tasdiqlaysizmi?\n\n{text}", reply_markup=markup)
-        return
-
+    # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
         if text.lower() == "ha":
             for user in registered_users:
@@ -113,7 +91,7 @@ def handle_text(message):
             bot.send_message(chat_id, "❗️ Tasdiqlash uchun 'Ha' yoki 'Yo'q' deb yozing.")
         return
 
-    # ===== Admin yetkazib berish vaqtini kiritish =====
+    # ======= Admin yetkazib berish vaqtini kiritish =======
     if chat_id in ADMIN_IDS and chat_id in pending_delivery and text.isdigit():
         delivery_minutes = int(text)
         order = pending_delivery.pop(chat_id)
@@ -136,20 +114,21 @@ def handle_text(message):
         main_menu(user_id)
         return
 
-    # ===== Admin menyusi =====
-    if chat_id in ADMIN_IDS and chat_id not in user_data:
-        if text == "👥 Foydalanuvchilar haqida ma’lumot":
-            if not registered_users:
-                bot.send_message(chat_id, "Hech qanday foydalanuvchi yo‘q.")
-            else:
-                text_list = "\n".join([str(user) for user in registered_users])
-                bot.send_message(chat_id, f"📋 Foydalanuvchilar ro‘yxati:\n{text_list}")
-        elif text == "📢 Post yuborish":
-            bot.send_message(chat_id, "📨 Xabar matnini kiriting:")
-            broadcast_cache[chat_id] = {"step": "text"}
+    if chat_id not in user_data:
+        # Admin menyusi
+        if chat_id in ADMIN_IDS:
+            if text == "👥 Foydalanuvchilar haqida ma’lumot":
+                if not registered_users:
+                    bot.send_message(chat_id, "Hech qanday foydalanuvchi yo‘q.")
+                else:
+                    text_list = "\n".join([f"@{user}" if isinstance(user, str) else str(user) for user in registered_users])
+                    bot.send_message(chat_id, f"📋 Foydalanuvchilar ro‘yxati:\n{text_list}")
+            elif text == "📢 Post yuborish":
+                bot.send_message(chat_id, "📨 Xabar matnini kiriting:")
+                broadcast_cache[chat_id] = {"step": "text"}
         return
 
-    # ===== Foydalanuvchi buyurtma =====
+    # ======= Foydalanuvchi buyurtma =======
     if "litr" not in user_data[chat_id]:
         if not text.isdigit():
             bot.send_message(chat_id, "❗️ Iltimos, faqat son kiriting (litr).")
@@ -174,15 +153,7 @@ def handle_text(message):
 def handle_location(message):
     chat_id = message.chat.id
     user_data[chat_id] = user_data.get(chat_id, {})
-    user_data[chat_id]["location"] = {
-        "latitude": message.location.latitude,
-        "longitude": message.location.longitude
-    }
-
-    # Lokatsiyani faqat forwarded message sifatida yuborish
-    bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)
-
-    # Foydalanuvchiga keyingi qadamni so‘rash
+    bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)  # Avvalgi adminlardan biriga yuborish
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
 
 # ================= Adminga buyurtma yuborish =================
@@ -198,6 +169,7 @@ def send_to_admin(chat_id, message):
 
     username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
     msg = f"🆕 Yangi buyurtma: {username}\n💧 Litr: {litrs}\n📞 Telefon: {phone}"
+    
     for admin_id in ADMIN_IDS:
         bot.send_message(admin_id, msg, reply_markup=markup)
 
@@ -213,8 +185,7 @@ def callback_handler(call):
             "user_id": user_id,
             "litr": litrs,
             "telefon": user_data[user_id]["telefon"],
-            "username": call.from_user.username or call.from_user.first_name,
-            "location": user_data[user_id].get("location")
+            "username": call.from_user.username or call.from_user.first_name
         }
         bot.send_message(call.message.chat.id, "⏱️ Necha daqiqada yetkaziladi? (faqat son kiriting)")
         bot.answer_callback_query(call.id, "Buyurtma qabul qilindi, yetkazish vaqtini kiriting")
@@ -226,12 +197,21 @@ def callback_handler(call):
             "litr": litrs,
             "telefon": user_data[user_id]["telefon"],
             "status": "rad qilindi",
-            "delivery_minutes": None,
-            "location": user_data[user_id].get("location")
+            "delivery_minutes": None
         })
         bot.send_message(user_id, "❌ Afsus, buyurtmangiz rad etildi.")
         bot.answer_callback_query(call.id, "Buyurtma rad qilindi")
         main_menu(user_id)
+
+# ================= Admin xabar yuborish =================
+@bot.message_handler(func=lambda m: m.chat.id in ADMIN_IDS)
+def admin_broadcast_handler(message):
+    if broadcast_cache.get(message.chat.id, {}).get("step") == "text":
+        broadcast_cache[message.chat.id]["text"] = message.text
+        broadcast_cache[message.chat.id]["step"] = "confirm"
+        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+        markup.add("Ha", "Yo'q")
+        bot.send_message(message.chat.id, f"Xabarni foydalanuvchilarga yuborishni tasdiqlaysizmi?\n\n{message.text}", reply_markup=markup)
 
 # ================= Botni ishga tushurish =================
 bot.infinity_polling()
