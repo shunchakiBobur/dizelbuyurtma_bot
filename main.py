@@ -178,8 +178,11 @@ def handle_location(message):
         "latitude": message.location.latitude,
         "longitude": message.location.longitude
     }
-    # Lokatsiyani adminlardan biriga forward qilamiz
+
+    # Lokatsiyani faqat forwarded message sifatida yuborish
     bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)
+
+    # Foydalanuvchiga keyingi qadamni so‘rash
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
 
 # ================= Adminga buyurtma yuborish =================
