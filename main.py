@@ -89,12 +89,8 @@ def handle_text(message):
     # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
         if text.lower() == "ha":
-            # Foydalanuvchilarga xabar yuborish
             for user in registered_users:
-                try:
-                    bot.send_message(user, broadcast_cache[chat_id]["text"])
-                except Exception as e:
-                    print(f"Foydalanuvchiga yuborishda xatolik: {e}")
+                bot.send_message(user, broadcast_cache[chat_id]["text"])
             bot.send_message(chat_id, "✅ Xabar foydalanuvchilarga yuborildi.")
             broadcast_cache.pop(chat_id)
         elif text.lower() in ["yo'q", "yoq"]:
@@ -141,17 +137,33 @@ def handle_text(message):
                 broadcast_cache[chat_id] = {"step": "text"}
         return
 
+    # ======= Foydalanuvchi buyurtma =======
+    if "litr" not in user_data[chat_id]:
+        if not text.isdigit():
+            bot.send_message(chat_id, "❗️ Iltimos, faqat son kiriting (litr).")
+            return
+        user_data[chat_id]["litr"] = int(text)
+
+        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+        location_btn = types.KeyboardButton("📍 Lokatsiya yuborish", request_location=True)
+        markup.add(location_btn)
+        bot.send_message(chat_id, "📍 Endi lokatsiya yuboring:", reply_markup=markup)
+        return
+
+    if "telefon" not in user_data[chat_id]:
+        user_data[chat_id]["telefon"] = text
+        send_to_admin(chat_id, message)
+        bot.send_message(chat_id, "📨 Buyurtmangiz operatorga yuborildi. Tez orada javob beramiz.")
+        main_menu(chat_id)
+        return
+
 # ================= Lokatsiyani qabul qilish =================
 @bot.message_handler(content_types=['location'])
 def handle_location(message):
     chat_id = message.chat.id
     user_data[chat_id] = user_data.get(chat_id, {})
-
-    # Lokatsiyani barcha adminlarga forward qilish
-    for admin_id in ADMIN_IDS:
-        bot.forward_message(admin_id, chat_id, message.message_id)
-
-    # Foydalanuvchiga telefon raqami so‘rash
+    # Lokatsiyani adminlardan biriga yuboramiz (birinchi admin)
+    bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
 
 # ================= Adminga buyurtma yuborish =================
