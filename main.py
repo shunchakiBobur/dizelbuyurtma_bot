@@ -89,6 +89,7 @@ def handle_text(message):
     # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
         if text.lower() == "ha":
+            # Foydalanuvchilarga xabar yuborish
             for user in registered_users:
                 bot.send_message(user, broadcast_cache[chat_id]["text"])
             bot.send_message(chat_id, "✅ Xabar foydalanuvchilarga yuborildi.")
@@ -162,8 +163,11 @@ def handle_text(message):
 def handle_location(message):
     chat_id = message.chat.id
     user_data[chat_id] = user_data.get(chat_id, {})
-    # Lokatsiyani adminlardan biriga yuboramiz (birinchi admin)
-    bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)
+
+    # Lokatsiyani barcha adminlarga yuborish
+    for admin_id in ADMIN_IDS:
+        bot.forward_message(admin_id, chat_id, message.message_id)
+
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
 
 # ================= Adminga buyurtma yuborish =================
