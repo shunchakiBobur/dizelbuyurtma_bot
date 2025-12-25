@@ -1,3 +1,4 @@
+import os
 import telebot
 from telebot import types
 
@@ -81,13 +82,14 @@ def handle_text(message):
                 bot.send_message(user, broadcast_cache[ADMIN_ID]["text"])
             bot.send_message(ADMIN_ID, "✅ Xabar foydalanuvchilarga yuborildi.")
             broadcast_cache.pop(ADMIN_ID)
-        elif text.lower() in ["yo'q","yoq"]:
+        elif text.lower() in ["yo'q", "yoq"]:
             bot.send_message(ADMIN_ID, "❌ Xabar yuborish bekor qilindi.")
             broadcast_cache.pop(ADMIN_ID)
         else:
             bot.send_message(ADMIN_ID, "❗️ Tasdiqlash uchun 'Ha' yoki 'Yo'q' deb yozing.")
         return
-# ======= Admin yetkazib berish vaqtini kiritish =======
+
+    # ======= Admin yetkazib berish vaqtini kiritish =======
     if chat_id == ADMIN_ID and chat_id in pending_delivery and text.isdigit():
         delivery_minutes = int(text)
         order = pending_delivery.pop(chat_id)
@@ -118,7 +120,7 @@ def handle_text(message):
                     bot.send_message(ADMIN_ID, f"📋 Foydalanuvchilar ro‘yxati:\n{text_list}")
             elif text == "📢 Post yuborish":
                 bot.send_message(ADMIN_ID, "📨 Xabar matnini kiriting:")
-                broadcast_cache[ADMIN_ID] = {"step":"text"}
+                broadcast_cache[ADMIN_ID] = {"step": "text"}
         return
 
     # ======= Foydalanuvchi buyurtma =======
@@ -147,7 +149,9 @@ def handle_text(message):
 @bot.message_handler(content_types=['location'])
 def handle_location(message):
     chat_id = message.chat.id
-    user_data[chat_id] = user_data.get(chat_id, {})
+    if chat_id not in user_data:
+        user_data[chat_id] = {}
+
     # Forward qilish orqali asl xabar adminga
     bot.forward_message(ADMIN_ID, chat_id, message.message_id)
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
@@ -173,7 +177,8 @@ def callback_handler(call):
     data = call.data
     user_id = int(data.split("_")[1])
     litrs = user_data[user_id]["litr"]
-if data.startswith("accept_"):
+
+    if data.startswith("accept_"):
         pending_delivery[call.message.chat.id] = {
             "user_id": user_id,
             "litr": litrs,
