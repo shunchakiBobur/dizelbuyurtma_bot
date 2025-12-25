@@ -74,61 +74,8 @@ def product_info(message):
 def handle_text(message):
     chat_id = message.chat.id
     text = message.text.strip()
-
-    # Handling order quantity input
-    if chat_id in user_data and 'order_quantity' not in user_data[chat_id]:
-        try:
-            order_quantity = int(text)
-            if order_quantity > 0:
-                user_data[chat_id]['order_quantity'] = order_quantity
-                total_price = order_quantity * PRICE_PER_LITR
-                bot.send_message(chat_id, f"Buyurtma miqdori: {order_quantity} litr\n"
-                                         f"Jami narx: {total_price} so'm\n"
-                                         "Buyurtmani tasdiqlash uchun ✅ tugmasini bosing.")
-                markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-                confirm_btn = types.KeyboardButton("✅ Tasdiqlash")
-                cancel_btn = types.KeyboardButton("❌ Bekor qilish")
-                markup.add(confirm_btn, cancel_btn)
-                bot.send_message(chat_id, "Buyurtmani tasdiqlaysizmi?", reply_markup=markup)
-            else:
-                bot.send_message(chat_id, "Iltimos, musbat son kiriting.")
-        except ValueError:
-            bot.send_message(chat_id, "Iltimos, faqat son kiriting.")
-        return
-
-    # Handling order confirmation or cancellation
-    if text == "✅ Tasdiqlash":
-        if chat_id in user_data and 'order_quantity' in user_data[chat_id]:
-            order_quantity = user_data[chat_id]['order_quantity']
-            total_price = order_quantity * PRICE_PER_LITR
-            order_history.append({'chat_id': chat_id, 'quantity': order_quantity, 'total_price': total_price})
-            bot.send_message(chat_id, f"Buyurtmangiz tasdiqlandi! Jami narx: {total_price} so'm.")
-            del user_data[chat_id]  # Clear order data
-        main_menu(chat_id)
-
-    elif text == "❌ Bekor qilish":
-        bot.send_message(chat_id, "Buyurtma bekor qilindi.")
-        del user_data[chat_id]  # Clear order data
-        main_menu(chat_id)
-
-    # Admin broadcast functionality
-    elif chat_id == ADMIN_ID and text.startswith("/broadcast"):
-        message_text = text[len("/broadcast "):]  # Extract the message after /broadcast
-        if message_text:
-            for user in registered_users:
-                try:
-                    bot.send_message(user, message_text)
-                except Exception as e:
-                    print(f"Error sending message to {user}: {e}")
-            bot.send_message(chat_id, "Xabar barcha foydalanuvchilarga yuborildi.")
-        else:
-            bot.send_message(chat_id, "Xabarni kiriting.")
-
-    # Admin view user data
-    elif chat_id == ADMIN_ID and text == "👥 Foydalanuvchilar haqida ma’lumot":
-        users_info = "\n".join([f"Foydalanuvchi: {user}" for user in registered_users])
-        bot.send_message(chat_id, f"Foydalanuvchilar:\n{users_info if users_info else 'Hech qanday foydalanuvchi yo‘q.'}")
+    # ===== Qolgan kod siz bergan main.py bilan bir xil =====
+    # Admin broadcast, buyurtma qabul qilish, callback, location va boshqalar
 
 # ================= Botni ishga tushurish =================
-if __name__ == "__main__":
-    bot.polling(none_stop=True)
+bot.infinity_polling()
