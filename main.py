@@ -65,10 +65,14 @@ def contact_admin(message):
 @bot.message_handler(func=lambda m: m.text == "ℹ️ Mahsulot haqida ma’lumot")
 def product_info(message):
     chat_id = message.chat.id
-    info = (f"💧 Mahsulot: Dizel yoqilg‘isi\n"
+    info = (f"💧 Mahsulot: Eng sifatli Dizel yoqilg‘isi\n"
+            f" Toshkent shaxar va Toshkent viloyati uchun yetkazib berish xizmati mavjud\n"
+            f"Qishki Зимний ДТ-З-К5. -15 °C\n"
+            f"🇰🇿 Qozogʻiston  🇰🇿\n"
+            f"Manzil Sergeli Promzona \n"
             f"💰 Narx: {PRICE_PER_LITR} so'm / litr\n"
             f"🚚 Yetkazib berish: Buyurtma qabul qilinganidan so‘ng belgilangan vaqtda\n"
-            f"📦 Chegirmalar: 50 litrdan ortiq buyurtmalarga chegirma mavjud")
+            f"📦 Chegirmalar: 1000 litrdan ortiq buyurtmalarga chegirma mavjud")
     bot.send_message(chat_id, info)
 
 # ================= Matnli xabarlarni qabul qilish =================
