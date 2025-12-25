@@ -89,7 +89,6 @@ def handle_text(message):
     # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
         if text.lower() == "ha":
-            # Foydalanuvchilarga xabar yuborish
             for user in registered_users:
                 bot.send_message(user, broadcast_cache[chat_id]["text"])
             bot.send_message(chat_id, "✅ Xabar foydalanuvchilarga yuborildi.")
