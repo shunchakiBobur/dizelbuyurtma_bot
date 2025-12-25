@@ -1,21 +1,41 @@
 import os
 import telebot
-from telebot import types
+from flask import Flask, request
 
 # =========================
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("BOT_TOKEN")  # Bot tokenini muhitdan olish
 ADMIN_ID = 6419271223  # Admin Telegram ID
-ADMIN_USERNAME = "admin_nik"  # Telegram username @sizning_admin_nik
-PRICE_PER_LITR = 10500
+ADMIN_USERNAME = "admin_nik"  # Adminning Telegram username
+PRICE_PER_LITR = 10500  # Narx
 # =========================
 
 bot = telebot.TeleBot(TOKEN)
 
-user_data = {}            # Mijoz ma'lumotlari
+user_data = {}            # Foydalanuvchi ma'lumotlari
 order_history = []        # Buyurtma tarixi
 pending_delivery = {}     # Yetkazib berish vaqtini kiritishni kutayotgan buyurtmalar
-registered_users = set()  # Bot foydalanuvchilari
+registered_users = set()  # Ro'yxatdan o'tgan foydalanuvchilar
 broadcast_cache = {}      # Admin xabar yuborish uchun
+
+# ================= Flask Webhook Sozlamalari =================
+app = Flask(__name__)
+
+@app.route('/' + TOKEN, methods=['POST'])
+def get_message():
+    json_str = request.get_data().decode('UTF-8')
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return "OK"
+
+@app.route('/')
+def webhook():
+    bot.remove_webhook()
+    # Telegram webhookni Railway domeningizga o'rnatish
+    bot.set_webhook(url=f'https://your-railway-app-url/{TOKEN}')
+    return "Webhook is set"
+
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 # ================= Main Menu =================
 def main_menu(chat_id):
@@ -82,7 +102,7 @@ def handle_text(message):
                 bot.send_message(user, broadcast_cache[ADMIN_ID]["text"])
             bot.send_message(ADMIN_ID, "✅ Xabar foydalanuvchilarga yuborildi.")
             broadcast_cache.pop(ADMIN_ID)
-        elif text.lower() in ["yo'q", "yoq"]:
+        elif text.lower() in ["yo'q","yoq"]:
             bot.send_message(ADMIN_ID, "❌ Xabar yuborish bekor qilindi.")
             broadcast_cache.pop(ADMIN_ID)
         else:
@@ -110,7 +130,6 @@ def handle_text(message):
         return
 
     if chat_id not in user_data:
-        # Admin menyusi
         if chat_id == ADMIN_ID:
             if text == "👥 Foydalanuvchilar haqida ma’lumot":
                 if not registered_users:
@@ -120,7 +139,7 @@ def handle_text(message):
                     bot.send_message(ADMIN_ID, f"📋 Foydalanuvchilar ro‘yxati:\n{text_list}")
             elif text == "📢 Post yuborish":
                 bot.send_message(ADMIN_ID, "📨 Xabar matnini kiriting:")
-                broadcast_cache[ADMIN_ID] = {"step": "text"}
+                broadcast_cache[ADMIN_ID] = {"step":"text"}
         return
 
     # ======= Foydalanuvchi buyurtma =======
@@ -149,9 +168,7 @@ def handle_text(message):
 @bot.message_handler(content_types=['location'])
 def handle_location(message):
     chat_id = message.chat.id
-    if chat_id not in user_data:
-        user_data[chat_id] = {}
-
+    user_data[chat_id] = user_data.get(chat_id, {})
     # Forward qilish orqali asl xabar adminga
     bot.forward_message(ADMIN_ID, chat_id, message.message_id)
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
@@ -174,11 +191,13 @@ def send_to_admin(chat_id, message):
 # ================= Callback tugmalar =================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    data = call.data
-    user_id = int(data.split("_")[1])
-    litrs = user_data[user_id]["litr"]
+    user_id = int(call.data.split("_")[1])  # User ID olish
+    if user_id not in user_data:
+        bot.answer_callback_query(call.id, "Foydalanuvchi ma'lumotlari topilmadi.")
+        return
 
-    if data.startswith("accept_"):
+    litrs = user_data[user_id].get("litr")
+    if call.data.startswith("accept_"):
         pending_delivery[call.message.chat.id] = {
             "user_id": user_id,
             "litr": litrs,
@@ -188,7 +207,7 @@ def callback_handler(call):
         bot.send_message(ADMIN_ID, "⏱️ Necha daqiqada yetkazilsin? (faqat son kiriting)")
         bot.answer_callback_query(call.id, "Buyurtma qabul qilindi, yetkazish vaqtini kiriting")
 
-    elif data.startswith("reject_"):
+    elif call.data.startswith("reject_"):
         order_history.append({
             "user_id": user_id,
             "username": user_data[user_id].get("username", ""),
