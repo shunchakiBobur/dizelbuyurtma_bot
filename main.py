@@ -5,7 +5,7 @@ from telebot import types
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")  # 🔥 TOKEN serverdan olinadi
 ADMIN_ID = 6419271223  # Admin Telegram ID
-ADMIN_USERNAME = "admin_nik"  # Telegram username @sizning_admin_nik
+ADMIN_USERNAME = "dizel_go"  # Telegram username @sizning_admin_nik
 PRICE_PER_LITR = 10500
 # =========================
 
@@ -186,7 +186,7 @@ def callback_handler(call):
             "telefon": user_data[user_id]["telefon"],
             "username": call.from_user.username or call.from_user.first_name
         }
-        bot.send_message(ADMIN_ID, "⏱️ Necha daqiqada yetkazilsin? (faqat son kiriting)")
+        bot.send_message(ADMIN_ID, "⏱️ Necha daqiqada yetkaziladi? (faqat son kiriting)")
         bot.answer_callback_query(call.id, "Buyurtma qabul qilindi, yetkazish vaqtini kiriting")
 
     elif data.startswith("reject_"):
