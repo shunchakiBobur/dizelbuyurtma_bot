@@ -1,20 +1,33 @@
 import os
+import json
 import telebot
 from telebot import types
 
 # =========================
-TOKEN = os.getenv("BOT_TOKEN")  # 🔥 TOKEN serverdan olinadi
-ADMIN_IDS = {6419271223, 6994628664}  # Bir nechta adminlar Telegram IDlari
-ADMIN_USERNAMES = {"dizel_go", "admin2"}  # Admin nicklari
+TOKEN = os.getenv("BOT_TOKEN")  # 🔥 BOT token serverdan olinadi
+ADMIN_IDS = {6419271223, 6994628664}  # Bir nechta adminlar Telegram ID
+ADMIN_USERNAMES = {"dizel_go", "admin2"}  # Adminlar username
 PRICE_PER_LITR = 10500
+USERS_FILE = "users.json"
 # =========================
 
 bot = telebot.TeleBot(TOKEN)
 
+# ================= Foydalanuvchilarni yuklash =================
+if os.path.exists(USERS_FILE):
+    with open(USERS_FILE, "r", encoding="utf-8") as f:
+        registered_users = set(json.load(f))
+else:
+    registered_users = set()
+
+def save_users():
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(list(registered_users), f, ensure_ascii=False)
+
+# ================= Ma’lumotlar =================
 user_data = {}            # Mijoz ma'lumotlari
 order_history = []        # Buyurtma tarixi
 pending_delivery = {}     # Yetkazib berish vaqtini kiritishni kutayotgan buyurtmalar
-registered_users = set()  # Bot foydalanuvchilari
 broadcast_cache = {}      # Admin xabar yuborish uchun
 
 # ================= Main Menu =================
@@ -41,6 +54,7 @@ def start(message):
     chat_id = message.chat.id
     if chat_id not in registered_users:
         registered_users.add(chat_id)
+        save_users()
         bot.send_message(chat_id, f"Assalomu alaykum, {message.from_user.first_name}!\nBotimizga xush kelibsiz!")
     if chat_id in ADMIN_IDS:
         admin_menu()
@@ -77,7 +91,7 @@ def handle_text(message):
     chat_id = message.chat.id
     text = message.text.strip()
 
-    # ======= Admin xabar yuborish =======
+    # ======= Admin post yuborish =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "text":
         broadcast_cache[chat_id]["text"] = text
         broadcast_cache[chat_id]["step"] = "confirm"
@@ -86,7 +100,6 @@ def handle_text(message):
         bot.send_message(chat_id, f"Xabarni foydalanuvchilarga yuborishni tasdiqlaysizmi?\n\n{text}", reply_markup=markup)
         return
 
-    # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
         if text.lower() == "ha":
             for user in registered_users:
@@ -100,7 +113,7 @@ def handle_text(message):
             bot.send_message(chat_id, "❗️ Tasdiqlash uchun 'Ha' yoki 'Yo'q' deb yozing.")
         return
 
-    # ======= Admin yetkazib berish vaqtini kiritish =======
+    # ======= Admin yetkazib berish =======
     if chat_id in ADMIN_IDS and chat_id in pending_delivery and text.isdigit():
         delivery_minutes = int(text)
         order = pending_delivery.pop(chat_id)
@@ -117,28 +130,26 @@ def handle_text(message):
         order['status'] = "qabul qilindi"
         order['delivery_minutes'] = delivery_minutes
         order_history.append(order)
-
         del user_data[user_id]
 
         main_menu(user_id)
         return
 
-    if chat_id not in user_data:
-        # Admin menyusi
-        if chat_id in ADMIN_IDS:
-            if text == "👥 Foydalanuvchilar haqida ma’lumot":
-                if not registered_users:
-                    bot.send_message(chat_id, "Hech qanday foydalanuvchi yo‘q.")
-                else:
-                    text_list = "\n".join([f"@{user}" if isinstance(user, str) else str(user) for user in registered_users])
-                    bot.send_message(chat_id, f"📋 Foydalanuvchilar ro‘yxati:\n{text_list}")
-            elif text == "📢 Post yuborish":
-                bot.send_message(chat_id, "📨 Xabar matnini kiriting:")
-                broadcast_cache[chat_id] = {"step": "text"}
+    # ================= Admin menyusi =================
+    if chat_id not in user_data and chat_id in ADMIN_IDS:
+        if text == "👥 Foydalanuvchilar haqida ma’lumot":
+            if not registered_users:
+                bot.send_message(chat_id, "Hech qanday foydalanuvchi yo‘q.")
+            else:
+                text_list = "\n".join([str(user) for user in registered_users])
+                bot.send_message(chat_id, f"📋 Foydalanuvchilar ro‘yxati:\n{text_list}")
+        elif text == "📢 Post yuborish":
+            bot.send_message(chat_id, "📨 Xabar matnini kiriting:")
+            broadcast_cache[chat_id] = {"step": "text"}
         return
 
-    # ======= Foydalanuvchi buyurtma =======
-    if "litr" not in user_data[chat_id]:
+    # ================= Foydalanuvchi buyurtma =================
+    if "litr" not in user_data.get(chat_id, {}):
         if not text.isdigit():
             bot.send_message(chat_id, "❗️ Iltimos, faqat son kiriting (litr).")
             return
