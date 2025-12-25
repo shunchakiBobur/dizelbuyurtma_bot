@@ -4,7 +4,7 @@ from telebot import types
 
 # =========================
 TOKEN = os.getenv("BOT_TOKEN")  # 🔥 TOKEN serverdan olinadi
-ADMIN_IDS = {6419271223,6994628664 }  # Bir nechta adminlar Telegram IDlari
+ADMIN_IDS = {6419271223, 6994628664}  # Bir nechta adminlar Telegram IDlari
 ADMIN_USERNAMES = {"dizel_go", "admin2"}  # Admin nicklari
 PRICE_PER_LITR = 10500
 # =========================
@@ -65,14 +65,10 @@ def contact_admin(message):
 @bot.message_handler(func=lambda m: m.text == "ℹ️ Mahsulot haqida ma’lumot")
 def product_info(message):
     chat_id = message.chat.id
-    info = (f"💧 Mahsulot: Eng sifatli Dizel yoqilg‘isi\n"
-            f" Toshkent shaxar va Toshkent viloyati uchun yetkazib berish xizmati mavjud\n"
-            f"Qishki Зимний ДТ-З-К5. -15 °C\n"
-            f"🇰🇿 Qozogʻiston  🇰🇿\n"
-            f"Manzil Sergeli Promzona \n"
+    info = (f"💧 Mahsulot: Dizel yoqilg‘isi\n"
             f"💰 Narx: {PRICE_PER_LITR} so'm / litr\n"
             f"🚚 Yetkazib berish: Buyurtma qabul qilinganidan so‘ng belgilangan vaqtda\n"
-            f"📦 Chegirmalar: 1000 litrdan ortiq buyurtmalarga chegirma mavjud")
+            f"📦 Chegirmalar: 50 litrdan ortiq buyurtmalarga chegirma mavjud")
     bot.send_message(chat_id, info)
 
 # ================= Matnli xabarlarni qabul qilish =================
@@ -80,6 +76,15 @@ def product_info(message):
 def handle_text(message):
     chat_id = message.chat.id
     text = message.text.strip()
+
+    # ======= Admin xabar yuborish =======
+    if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "text":
+        broadcast_cache[chat_id]["text"] = text
+        broadcast_cache[chat_id]["step"] = "confirm"
+        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+        markup.add("Ha", "Yo'q")
+        bot.send_message(chat_id, f"Xabarni foydalanuvchilarga yuborishni tasdiqlaysizmi?\n\n{text}", reply_markup=markup)
+        return
 
     # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
@@ -157,7 +162,8 @@ def handle_text(message):
 def handle_location(message):
     chat_id = message.chat.id
     user_data[chat_id] = user_data.get(chat_id, {})
-    bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)  # Avvalgi adminlardan biriga yuborish
+    # Lokatsiyani adminlardan biriga yuboramiz (birinchi admin)
+    bot.forward_message(list(ADMIN_IDS)[0], chat_id, message.message_id)
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
 
 # ================= Adminga buyurtma yuborish =================
@@ -173,7 +179,7 @@ def send_to_admin(chat_id, message):
 
     username = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
     msg = f"🆕 Yangi buyurtma: {username}\n💧 Litr: {litrs}\n📞 Telefon: {phone}"
-    
+
     for admin_id in ADMIN_IDS:
         bot.send_message(admin_id, msg, reply_markup=markup)
 
@@ -206,16 +212,6 @@ def callback_handler(call):
         bot.send_message(user_id, "❌ Afsus, buyurtmangiz rad etildi.")
         bot.answer_callback_query(call.id, "Buyurtma rad qilindi")
         main_menu(user_id)
-
-# ================= Admin xabar yuborish =================
-@bot.message_handler(func=lambda m: m.chat.id in ADMIN_IDS)
-def admin_broadcast_handler(message):
-    if broadcast_cache.get(message.chat.id, {}).get("step") == "text":
-        broadcast_cache[message.chat.id]["text"] = message.text
-        broadcast_cache[message.chat.id]["step"] = "confirm"
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-        markup.add("Ha", "Yo'q")
-        bot.send_message(message.chat.id, f"Xabarni foydalanuvchilarga yuborishni tasdiqlaysizmi?\n\n{message.text}", reply_markup=markup)
 
 # ================= Botni ishga tushurish =================
 bot.infinity_polling()
