@@ -123,8 +123,8 @@ def handle_text(message):
         main_menu(user_id)
         return
 
+    # ======= Admin buyurtmalarini tasdiqlash =======
     if chat_id not in user_data:
-        # Admin menyusi
         if chat_id in ADMIN_IDS:
             if text == "👥 Foydalanuvchilar haqida ma’lumot":
                 if not registered_users:
