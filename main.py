@@ -162,18 +162,10 @@ def handle_text(message):
 def handle_location(message):
     chat_id = message.chat.id
     user_data[chat_id] = user_data.get(chat_id, {})
-    # Lokatsiyani foydalanuvchidan qabul qilish
-    user_data[chat_id]["location"] = {
-        "latitude": message.location.latitude,
-        "longitude": message.location.longitude
-    }
 
-    # Lokatsiyani barcha adminlarga yuborish
+    # Lokatsiyani barcha adminlarga forward qilish
     for admin_id in ADMIN_IDS:
-        bot.send_message(admin_id, f"🗺️ Yangi lokatsiya:\n"
-                                   f"📍 Latitude: {message.location.latitude}\n"
-                                   f"📍 Longitude: {message.location.longitude}\n"
-                                   f"Foydalanuvchi: @{message.from_user.username or message.from_user.first_name}")
+        bot.forward_message(admin_id, chat_id, message.message_id)
 
     # Foydalanuvchiga telefon raqami so‘rash
     bot.send_message(chat_id, "📞 Endi telefon raqamingizni yuboring:")
