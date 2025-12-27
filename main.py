@@ -7,10 +7,6 @@ TOKEN = os.getenv("BOT_TOKEN")  # 🔥 TOKEN serverdan olinadi
 ADMIN_IDS = {6419271223, 6994628664}  # Bir nechta adminlar Telegram IDlari
 ADMIN_USERNAMES = {"dizel_go", "admin2"}  # Admin nicklari
 PRICE_PER_LITR = 10500
-PRODUCT_INFO_TEXT = (f"💧 Mahsulot: Dizel yoqilg‘isi\n"
-                     f"💰 Narx: {PRICE_PER_LITR} so'm / litr\n"
-                     f"🚚 Yetkazib berish: Buyurtma qabul qilinganidan so‘ng belgilangan vaqtda\n"
-                     f"📦 Chegirmalar: 50 litrdan ortiq buyurtmalarga chegirma mavjud")
 # =========================
 
 bot = telebot.TeleBot(TOKEN)
@@ -18,9 +14,8 @@ bot = telebot.TeleBot(TOKEN)
 user_data = {}            # Mijoz ma'lumotlari
 order_history = []        # Buyurtma tarixi
 pending_delivery = {}     # Yetkazib berish vaqtini kiritishni kutayotgan buyurtmalar
-registered_users = set()  # Bot foydalanuchilari
+registered_users = set()  # Bot foydalanuvchilari
 broadcast_cache = {}      # Admin xabar yuborish uchun
-edit_cache = {}           # Admin ma'lumotlarni tahrirlash uchun
 
 # ================= Main Menu =================
 def main_menu(chat_id):
@@ -36,8 +31,7 @@ def admin_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     users_btn = types.KeyboardButton("👥 Foydalanuvchilar haqida ma’lumot")
     post_btn = types.KeyboardButton("📢 Post yuborish")
-    edit_btn = types.KeyboardButton("✏️ Ma’lumotlarni taxrirlash")  # Yangi tugma
-    markup.add(users_btn, post_btn, edit_btn)
+    markup.add(users_btn, post_btn)
     for admin_id in ADMIN_IDS:
         bot.send_message(admin_id, "Admin menyu:", reply_markup=markup)
 
@@ -71,7 +65,11 @@ def contact_admin(message):
 @bot.message_handler(func=lambda m: m.text == "ℹ️ Mahsulot haqida ma’lumot")
 def product_info(message):
     chat_id = message.chat.id
-    bot.send_message(chat_id, PRODUCT_INFO_TEXT)
+    info = (f"💧 Mahsulot: Dizel yoqilg‘isi\n"
+            f"💰 Narx: {PRICE_PER_LITR} so'm / litr\n"
+            f"🚚 Yetkazib berish: Buyurtma qabul qilinganidan so‘ng belgilangan vaqtda\n"
+            f"📦 Chegirmalar: 50 litrdan ortiq buyurtmalarga chegirma mavjud")
+    bot.send_message(chat_id, info)
 
 # ================= Matnli xabarlarni qabul qilish =================
 @bot.message_handler(func=lambda m: True, content_types=['text'])
@@ -91,15 +89,16 @@ def handle_text(message):
     # ======= Admin xabar yuborish tasdiqlash =======
     if chat_id in ADMIN_IDS and broadcast_cache.get(chat_id, {}).get("step") == "confirm":
         if text.lower() == "ha":
+            # Barcha foydalanuvchilarga xabar yuboriladi
             for user in registered_users:
                 bot.send_message(user, broadcast_cache[chat_id]["text"])
             bot.send_message(chat_id, "✅ Xabar foydalanuvchilarga yuborildi.")
             broadcast_cache.pop(chat_id)
-            admin_menu()
+            admin_menu()  # Admin paneliga qaytish
         elif text.lower() in ["yo'q", "yoq"]:
             bot.send_message(chat_id, "❌ Xabar yuborish bekor qilindi.")
             broadcast_cache.pop(chat_id)
-            admin_menu()
+            admin_menu()  # Admin paneliga qaytish
         else:
             bot.send_message(chat_id, "❗️ Tasdiqlash uchun 'Ha' yoki 'Yo'q' deb yozing.")
         return
@@ -127,7 +126,7 @@ def handle_text(message):
         main_menu(user_id)
         return
 
-    # ======= Admin panel buyruqlari =======
+    # ======= Admin buyurtmalarini ko'rish va boshqa buyruqlar =======
     if chat_id not in user_data:
         if chat_id in ADMIN_IDS:
             if text == "👥 Foydalanuvchilar haqida ma’lumot":
@@ -139,50 +138,10 @@ def handle_text(message):
             elif text == "📢 Post yuborish":
                 bot.send_message(chat_id, "📨 Xabar matnini kiriting:")
                 broadcast_cache[chat_id] = {"step": "text"}
-            elif text == "✏️ Ma’lumotlarni taxrirlash":  # Taxrirlash boshlangan
-                edit_cache[chat_id] = {"step": "choose"}
-                markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-                markup.add("💰 Narxni o‘zgartirish", "💧 Mahsulot ma’lumotini o‘zgartirish")
-                bot.send_message(chat_id, "Qaysi ma’lumotni o‘zgartirmoqchisiz?", reply_markup=markup)
         return
 
-    # ======= Admin ma'lumotlarni tahrirlash jarayoni =======
-    if chat_id in edit_cache:
-        step = edit_cache[chat_id]["step"]
-        global PRICE_PER_LITR, PRODUCT_INFO_TEXT
-
-        if step == "choose":
-            if text == "💰 Narxni o‘zgartirish":
-                edit_cache[chat_id]["step"] = "price"
-                bot.send_message(chat_id, f"Hozirgi narx: {PRICE_PER_LITR} so'm\nYangi narxni kiriting:")
-            elif text == "💧 Mahsulot ma’lumotini o‘zgartirish":
-                edit_cache[chat_id]["step"] = "product_info"
-                bot.send_message(chat_id, "Hozirgi mahsulot haqida ma’lumotni kiriting:")
-            else:
-                bot.send_message(chat_id, "❗️ Iltimos, menyudan tanlang.")
-            return
-        if step == "price":
-            if not text.isdigit():
-                bot.send_message(chat_id, "❗️ Iltimos, faqat son kiriting.")
-                return
-            PRICE_PER_LITR = int(text)
-            PRODUCT_INFO_TEXT = (f"💧 Mahsulot: Dizel yoqilg‘isi\n"
-                                 f"💰 Narx: {PRICE_PER_LITR} so'm / litr\n"
-                                 f"🚚 Yetkazib berish: Buyurtma qabul qilinganidan so‘ng belgilangan vaqtda\n"
-                                 f"📦 Chegirmalar: 50 litrdan ortiq buyurtmalarga chegirma mavjud")
-            bot.send_message(chat_id, f"✅ Narx muvaffaqiyatli o‘zgartirildi: {PRICE_PER_LITR} so'm")
-            edit_cache.pop(chat_id)
-            admin_menu()
-            return
-        if step == "product_info":
-            PRODUCT_INFO_TEXT = text
-            bot.send_message(chat_id, "✅ Mahsulot haqida ma’lumot muvaffaqiyatli o‘zgartirildi.")
-            edit_cache.pop(chat_id)
-            admin_menu()
-            return
-
     # ======= Foydalanuvchi buyurtma =======
-    if "litr" not in user_data.get(chat_id, {}):
+    if "litr" not in user_data[chat_id]:
         if not text.isdigit():
             bot.send_message(chat_id, "❗️ Iltimos, faqat son kiriting (litr).")
             return
@@ -207,6 +166,7 @@ def handle_location(message):
     chat_id = message.chat.id
     user_data[chat_id] = user_data.get(chat_id, {})
 
+    # Lokatsiyani barcha adminlarga yuborish
     for admin_id in ADMIN_IDS:
         bot.forward_message(admin_id, chat_id, message.message_id)
 
